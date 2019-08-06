@@ -7,6 +7,8 @@ import (
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/digest"
 	manifestV1 "github.com/docker/distribution/manifest/schema1"
+
+	//manifestV2 "github.com/docker/distribution/manifest/schema2"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/heroku/docker-registry-client/registry"
 	"github.com/vbaksa/promoter/progressbar"
@@ -46,6 +48,76 @@ func MissingLayers(destHub *registry.Registry, destImage string, srcLayers []man
 					Err: err,
 					Missing: &missingLayer{
 						Blob: layer.BlobSum,
+					},
+				}
+				result <- checkResult
+
+			} else {
+				// Layer exists
+				fmt.Println("Layer already exists on Remote Registry: " + layerMetada.Digest)
+				checkResult := &layerCheckResult{
+					Err: nil,
+					Exists: &existingLayer{
+						Descriptor: layerMetada,
+					},
+				}
+				result <- checkResult
+			}
+		}(layer, result)
+	}
+
+	// Wait for result (each layer check)
+	for i := 0; i < len(srcLayers); i++ {
+		res := <-result
+		// If we got result about missing layer on remote registry, else check result about existing layer
+		if res.Missing != nil {
+			//iterate over existing array and make sure that there is no duplicate layers
+			var e = false
+			for _, r := range results {
+				if r == res.Missing.Blob {
+					e = true
+				}
+			}
+			//does not exist on array
+			if !e {
+				results = append(results, res.Missing.Blob)
+			}
+
+		} else {
+			totalSaved = totalSaved + res.Exists.Descriptor.Size
+		}
+	}
+	fmt.Println()
+	if totalSaved > 100 {
+		fmt.Printf("Some layers already exist on Remote Registry. Skipping around %s of layer data. Total network bandwidth saved: %s \n", humanize.Bytes(uint64(totalSaved)), humanize.Bytes(uint64(totalSaved*2)))
+	}
+	fmt.Println()
+
+	return results
+}
+
+//MissingLayers computes list of layers required to be uploaded. Upload is optimized by skipping existing layers
+func MissingLayersV2(destHub *registry.Registry, destImage string, srcLayers []distribution.Descriptor) []digest.Digest {
+
+	//Layers array returned by function
+	results := make([]digest.Digest, 0)
+	//How much space we will save by skipping already existing layers
+	var totalSaved int64
+	//Temporary result channel
+	result := make(chan *layerCheckResult)
+
+	// check each layer on remote hub
+	for _, layer := range srcLayers {
+		go func(layer distribution.Descriptor, result chan *layerCheckResult) {
+
+			layerMetada, err := destHub.LayerMetadata(destImage, layer.Digest)
+			if err != nil {
+				// Layer does not exist
+				//	fmt.Println("Layer does not exist: " + layer.BlobSum)
+				checkResult := &layerCheckResult{
+					Err: err,
+					Missing: &missingLayer{
+						Blob: layer.Digest,
 					},
 				}
 				result <- checkResult

@@ -59,6 +59,9 @@ func init() {
 type Manifest struct {
 	manifest.Versioned
 
+	MediaType string `json:"mediaType"`
+	// must be "application/vnd.docker.distribution.manifest.v2+json
+
 	// Config references the image configuration as a blob.
 	Config distribution.Descriptor `json:"config"`
 

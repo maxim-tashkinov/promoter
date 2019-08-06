@@ -2,6 +2,7 @@ package registry
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -116,6 +117,35 @@ func (registry *Registry) PutManifest(repository, reference string, signedManife
 	}
 
 	req.Header.Set("Content-Type", manifestV1.MediaTypeManifest)
+	resp, err := registry.Client.Do(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	return err
+}
+
+func (registry *Registry) PutManifestV2(repository, reference string, signedManifest *manifestV2.DeserializedManifest) error {
+	url := registry.url("/v2/%s/manifests/%s", repository, reference)
+	registry.Logf("registry.manifest.put url=%s repository=%s reference=%s", url, repository, reference)
+
+	body, err := signedManifest.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	buffer := bytes.NewBuffer(body)
+	fmt.Println("URL", url)
+
+	fmt.Println("BUFF")
+	fmt.Println(buffer)
+	fmt.Println("<<BUFF")
+
+	req, err := http.NewRequest("PUT", url, buffer)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", manifestV2.MediaTypeManifest)
 	resp, err := registry.Client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()
