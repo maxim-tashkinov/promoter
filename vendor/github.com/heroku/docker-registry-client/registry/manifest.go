@@ -69,6 +69,7 @@ func (registry *Registry) ManifestV2(repository, reference string) (*manifestV2.
 	ds, _ := deserialized.MarshalJSON()
 	buffer := bytes.NewBuffer(ds)
 	fmt.Println("deserialized source manifest:\n", buffer, "\n<<<<\n")
+	fmt.Println("deserialized source manifest digest:\n", deserialized.Config.Digest.String(), "\n<<<<\n")
 
 	return deserialized, nil
 }

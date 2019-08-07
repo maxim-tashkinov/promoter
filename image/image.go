@@ -105,8 +105,8 @@ func (pr *Promote) PromoteImage() {
 
 	fmt.Println("Submitting Image Manifest")
 	//	err = destHub.PutManifest(pr.DestImage, pr.DestImageTag, signedManifest)
-	//err = destHub.PutManifestV2(pr.DestImage, pr.DestImageTag, deserializedManifest)
-	err = destHub.PutManifestV2(pr.DestImage, srcManifestV2.Config.Digest.String(), srcManifestV2)
+	err = destHub.PutManifestV2(pr.DestImage, pr.DestImageTag, srcManifestV2)
+	//err = destHub.PutManifestV2(pr.DestImage, srcManifestV2.Config.Digest.String(), srcManifestV2)
 	if err != nil {
 		fmt.Println("Manifest update error: " + err.Error())
 		os.Exit(1)
