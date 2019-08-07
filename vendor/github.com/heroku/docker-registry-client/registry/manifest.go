@@ -66,6 +66,10 @@ func (registry *Registry) ManifestV2(repository, reference string) (*manifestV2.
 	if err != nil {
 		return nil, err
 	}
+	ds, _ := deserialized.MarshalJSON()
+	buffer := bytes.NewBuffer(ds)
+	fmt.Println("deserialized source manifest:\n", buffer, "\n<<<<\n")
+
 	return deserialized, nil
 }
 
@@ -134,7 +138,7 @@ func (registry *Registry) PutManifestV2(repository, reference string, signedMani
 	}
 
 	buffer := bytes.NewBuffer(body)
-	fmt.Println("URL", url)
+	fmt.Println("URL", url, reference)
 
 	fmt.Println("BUFF")
 	fmt.Println(buffer)
