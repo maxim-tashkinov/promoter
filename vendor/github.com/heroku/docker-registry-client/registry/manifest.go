@@ -129,6 +129,74 @@ func (registry *Registry) PutManifest(repository, reference string, signedManife
 	return err
 }
 
+func (registry *Registry) HeadManifestV2(repository, reference string) error {
+	url := registry.url("/v2/%s/blobs/%s", repository, reference)
+	registry.Logf("registry.manifest.HEAD url=%s repository=%s reference=%s", url, repository, reference)
+
+	req, err := http.Head(url)
+	if err != nil {
+		return err
+	}
+	fmt.Println(req.Body)
+	//req.Header.Set("Content-Type", manifestV2.MediaTypeManifest)
+
+	return err
+}
+
+func (registry *Registry) PutManifestBlobV2(repository string, body []byte, digest string) error {
+	uploadUrl := registry.url("/v2/%s/blobs/uploads/a32f50f6-1eb0-40db-afa1-52cdb0aaddac", repository)
+
+	fmt.Println("Try push Manifest as blob")
+	registry.Logf("registry.layer.upload manifest url=%s repository=%s digest=%s", uploadUrl, repository, digest)
+
+	buffer := bytes.NewReader(body)
+	fmt.Println("PutManifestBlobV2 1")
+	upload, err := http.NewRequest("PUT", uploadUrl, buffer)
+	fmt.Println("PutManifestBlobV2 2")
+	if err != nil {
+		return err
+	}
+	fmt.Println("PutManifestBlobV2 3")
+	upload.Header.Set("digest", digest)
+	fmt.Println("PutManifestBlobV2 4")
+	upload.Header.Set("Content-Type", "application/octet-stream")
+	fmt.Println("PutManifestBlobV2 5")
+	res, err := registry.Client.Do(upload)
+	fmt.Println("PutManifestBlobV2 6", res.StatusCode)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (registry *Registry) GetManifestConfig(repository string, manifest *manifestV2.DeserializedManifest) ([]byte, error) {
+	digest := manifest.Config.Digest.String()
+	url := registry.url("/v2/%s/blobs/%s", repository, digest)
+	registry.Logf("registry.GetManifestConfig blob url=%s repository=%s digest=%s", url, repository, digest)
+
+	req, err := http.NewRequest("GET", url, nil)
+	//if err != nil {
+	//	return make([]byte, 1tur), err
+	//}
+
+	req.Header.Set("Content-Type", manifestV2.MediaTypeManifest)
+	resp, err := registry.Client.Do(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	buffer := bytes.NewBuffer(body)
+
+	fmt.Println("BUFF CONFIG")
+	fmt.Println(buffer)
+	fmt.Println("<<BUFF CONFIG")
+
+	return body, err
+}
+
 func (registry *Registry) PutManifestV2(repository, reference string, signedManifest *manifestV2.DeserializedManifest) error {
 	url := registry.url("/v2/%s/manifests/%s", repository, reference)
 	registry.Logf("registry.manifest.put url=%s repository=%s reference=%s", url, repository, reference)
@@ -137,6 +205,12 @@ func (registry *Registry) PutManifestV2(repository, reference string, signedMani
 	if err != nil {
 		return err
 	}
+
+	// check manifest exists - tmp
+	err = registry.HeadManifestV2(repository, signedManifest.Config.Digest.String())
+
+	// try put manifest to blob
+	//err = registry.PutManifestBlobV2(repository, signedManifest)
 
 	buffer := bytes.NewBuffer(body)
 	fmt.Println("URL", url, reference)

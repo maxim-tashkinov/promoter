@@ -1,10 +1,10 @@
 package image
 
 import (
+	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
-
-	"fmt"
 	"os"
 
 	"github.com/docker/distribution/digest"
@@ -49,6 +49,7 @@ func (pr *Promote) PromoteImage() {
 	fmt.Println("Destination image: " + pr.DestImage + ":" + pr.DestImageTag)
 
 	srcManifestV2, err := srcHub.ManifestV2(pr.SrcImage, pr.SrcImageTag)
+
 	// srcManifest, err := srcHub.Manifest(pr.SrcImage, pr.SrcImageTag)
 	if err != nil {
 		fmt.Println("Failed to download Source Image manifest. Error: " + err.Error())
@@ -56,6 +57,14 @@ func (pr *Promote) PromoteImage() {
 	}
 	fmt.Println("Manifest version:", srcManifestV2.Versioned.SchemaVersion)
 	fmt.Println("Manifest media type:", srcManifestV2.Versioned.MediaType)
+
+	srcManifestConfig, err := srcHub.GetManifestConfig(pr.SrcImage, srcManifestV2)
+
+	if err != nil {
+		fmt.Println("Failed to get ManifestConfig. Error: " + err.Error())
+		os.Exit(1)
+	}
+	fmt.Println("ManifestConfig, len", len(srcManifestConfig))
 
 	srcLayersV2 := srcManifestV2.Layers
 
@@ -104,9 +113,14 @@ func (pr *Promote) PromoteImage() {
 	fmt.Println("srcManifestV2 ConfigDigest", srcManifestV2.Config.Digest)
 
 	fmt.Println("Submitting Image Manifest")
-	//	err = destHub.PutManifest(pr.DestImage, pr.DestImageTag, signedManifest)
+
+	fmt.Println("TRY PutManifestBlobV2")
+	buffer := bytes.NewBuffer(srcManifestConfig)
+	err = destHub.UploadLayer(pr.DestImage, srcManifestV2.Config.Digest, buffer)
+	//err = destHub.PutManifestBlobV2(pr.DestImage, srcManifestConfig, srcManifestV2.Config.Digest.String())
+	fmt.Println("TRY PutManifestV2")
 	err = destHub.PutManifestV2(pr.DestImage, pr.DestImageTag, srcManifestV2)
-	//err = destHub.PutManifestV2(pr.DestImage, srcManifestV2.Config.Digest.String(), srcManifestV2)
+
 	if err != nil {
 		fmt.Println("Manifest update error: " + err.Error())
 		os.Exit(1)
