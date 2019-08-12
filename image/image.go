@@ -55,8 +55,12 @@ func (pr *Promote) PromoteImage() {
 		fmt.Println("Failed to download Source Image manifest. Error: " + err.Error())
 		os.Exit(1)
 	}
+
 	fmt.Println("Manifest version:", srcManifestV2.Versioned.SchemaVersion)
-	fmt.Println("Manifest media type:", srcManifestV2.Versioned.MediaType)
+	if srcManifestV2.Versioned.SchemaVersion != 2 {
+		fmt.Println("manifest V1 is not supported, exit")
+		os.Exit(0)
+	}
 
 	srcManifestConfig, err := srcHub.GetManifestConfig(pr.SrcImage, srcManifestV2)
 
@@ -64,14 +68,10 @@ func (pr *Promote) PromoteImage() {
 		fmt.Println("Failed to get ManifestConfig. Error: " + err.Error())
 		os.Exit(1)
 	}
-	fmt.Println("ManifestConfig, len", len(srcManifestConfig))
 
 	srcLayersV2 := srcManifestV2.Layers
 
-	for _, layer_ := range srcLayersV2 {
-		fmt.Println(layer_.Digest, layer_.Size, layer_.URLs)
-	}
-	fmt.Println("Optimising upload for v2...")
+	fmt.Println("Optimising upload for manifest V2...")
 	uploadLayerV2 := layer.MissingLayersV2(destHub, pr.DestImage, srcLayersV2)
 
 	if len(uploadLayerV2) > 0 {
@@ -88,7 +88,6 @@ func (pr *Promote) PromoteImage() {
 		var totalReader = make(chan int64)
 		for _, l := range uploadLayerV2 {
 			go func(l digest.Digest) {
-				fmt.Println("V2 UploadLayerWithProgress", pr.DestImage, l)
 				layer.UploadLayerWithProgress(destHub, pr.DestImage, srcHub, pr.SrcImage, l, &totalReader)
 				done <- true
 			}(l)
@@ -110,15 +109,10 @@ func (pr *Promote) PromoteImage() {
 		fmt.Println("Finished uploading layers")
 	}
 
-	fmt.Println("srcManifestV2 ConfigDigest", srcManifestV2.Config.Digest)
-
-	fmt.Println("Submitting Image Manifest")
-
-	fmt.Println("TRY PutManifestBlobV2")
+	fmt.Println("Submitting config of image")
 	buffer := bytes.NewBuffer(srcManifestConfig)
 	err = destHub.UploadLayer(pr.DestImage, srcManifestV2.Config.Digest, buffer)
-	//err = destHub.PutManifestBlobV2(pr.DestImage, srcManifestConfig, srcManifestV2.Config.Digest.String())
-	fmt.Println("TRY PutManifestV2")
+	fmt.Println("Submitting Image Manifest")
 	err = destHub.PutManifestV2(pr.DestImage, pr.DestImageTag, srcManifestV2)
 
 	if err != nil {
